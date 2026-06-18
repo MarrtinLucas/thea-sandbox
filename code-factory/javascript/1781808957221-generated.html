@@ -1,0 +1,486 @@
+// === FILE: index.html ===
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bubble Blast - 8 Bit Nintendo Style</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="title-screen">
+            <h1 class="pixel-title">BUBBLE BLAST</h1>
+            <p class="pixel-subtitle">PRESS START</p>
+            <button id="start-btn" class="pixel-btn">▶ START</button>
+            <div class="instructions pixel-text">
+                <p>CLICK TO CREATE BUBBLES</p>
+                <p>WATCH THEM GROW & POP!</p>
+                <p>HIGH SCORE: <span id="high-score">0</span></p>
+            </div>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+        <div id="hud" class="pixel-text hidden">
+            <span>SCORE: <span id="score">0</span></span>
+            <span>BUBBLES: <span id="bubble-count">0</span></span>
+        </div>
+        <div id="game-over" class="hidden">
+            <h2 class="pixel-title">GAME OVER</h2>
+            <p class="pixel-text">FINAL SCORE: <span id="final-score">0</span></p>
+            <button id="restart-btn" class="pixel-btn">▶ RESTART</button>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
+
+// === FILE: styles.css ===
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+@font-face {
+    font-family: 'PixelFont';
+    src: url('data:font/woff2;base64,') format('woff2');
+}
+
+body {
+    background: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+}
+
+#game-container {
+    position: relative;
+    width: 800px;
+    height: 600px;
+    border: 4px solid #e94560;
+    box-shadow: 0 0 20px rgba(233, 69, 96, 0.5), inset 0 0 20px rgba(233, 69, 96, 0.2);
+    background: #0f3460;
+}
+
+#title-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: #16213e;
+    z-index: 10;
+}
+
+.pixel-title {
+    font-size: 48px;
+    color: #e94560;
+    text-shadow: 4px 4px 0 #0f3460, 6px 6px 0 #1a1a2e;
+    letter-spacing: 8px;
+    margin-bottom: 20px;
+    animation: pulse 1.5s infinite;
+}
+
+.pixel-subtitle {
+    font-size: 20px;
+    color: #00ff00;
+    text-shadow: 2px 2px 0 #003300;
+    letter-spacing: 4px;
+    margin-bottom: 40px;
+    animation: blink 1s infinite;
+}
+
+.pixel-btn {
+    background: #e94560;
+    border: 3px solid #1a1a2e;
+    color: #1a1a2e;
+    font-family: 'Courier New', monospace;
+    font-size: 24px;
+    font-weight: bold;
+    padding: 12px 40px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    image-rendering: pixelated;
+    transition: all 0.1s;
+    box-shadow: 4px 4px 0 #1a1a2e;
+}
+
+.pixel-btn:hover {
+    background: #ff6b81;
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 #1a1a2e;
+}
+
+.pixel-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 #1a1a2e;
+}
+
+.pixel-text {
+    font-family: 'Courier New', monospace;
+    color: #00ff00;
+    text-shadow: 1px 1px 0 #003300;
+    font-size: 14px;
+    letter-spacing: 2px;
+    line-height: 2;
+}
+
+.instructions {
+    margin-top: 40px;
+    text-align: center;
+}
+
+#gameCanvas {
+    display: none;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+#hud {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 2px solid #e94560;
+    z-index: 5;
+}
+
+#game-over {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 20;
+}
+
+.hidden {
+    display: none !important;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+// === FILE: game.js ===
+class Bubble {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 4;
+        this.maxRadius = 30 + Math.random() * 25;
+        this.growRate = 0.3 + Math.random() * 0.5;
+        this.exploding = false;
+        this.explosionRadius = 0;
+        this.maxExplosionRadius = 60 + Math.random() * 40;
+        this.explosionSpeed = 4 + Math.random() * 3;
+        this.color = this.randomColor();
+        this.particles = [];
+        this.alpha = 1;
+        this.shimmer = 0;
+        this.shimmerSpeed = 0.02 + Math.random() * 0.03;
+    }
+
+    randomColor() {
+        const colors = [
+            '#ff0040', '#ff8000', '#ffff00', '#00ff40',
+            '#00ffff', '#0040ff', '#8000ff', '#ff00ff'
+        ];
+        return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    update() {
+        if (this.exploding) {
+            this.explosionRadius += this.explosionSpeed;
+            this.alpha = Math.max(0, 1 - (this.explosionRadius / this.maxExplosionRadius));
+            
+            for (let i = 0; i < 2; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1 + Math.random() * 3;
+                this.particles.push({
+                    x: this.x,
+                    y: this.y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1,
+                    color: this.color,
+                    size: 2 + Math.random() * 3
+                });
+            }
+
+            this.particles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.02;
+                p.size *= 0.98;
+            });
+            this.particles = this.particles.filter(p => p.life > 0);
+
+            return this.alpha > 0 || this.particles.length > 0;
+        }
+
+        if (this.radius < this.maxRadius) {
+            this.radius += this.growRate;
+            this.shimmer += this.shimmerSpeed;
+        } else {
+            this.exploding = true;
+        }
+
+        return true;
+    }
+
+    draw(ctx) {
+        if (this.exploding) {
+            this.particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(
+                    Math.round(p.x - p.size/2),
+                    Math.round(p.y - p.size/2),
+                    Math.round(p.size),
+                    Math.round(p.size)
+                );
+                ctx.restore();
+            });
+
+            if (this.alpha > 0) {
+                ctx.save();
+                ctx.globalAlpha = this.alpha * 0.3;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(
+                    Math.round(this.x - this.explosionRadius),
+                    Math.round(this.y - this.explosionRadius),
+                    Math.round(this.explosionRadius * 2),
+                    Math.round(this.explosionRadius * 2)
+                );
+                ctx.restore();
+            }
+            return;
+        }
+
+        ctx.save();
+        
+        // Main bubble
+        ctx.fillStyle = this.color;
+        ctx.fillRect(
+            Math.round(this.x - this.radius),
+            Math.round(this.y - this.radius),
+            Math.round(this.radius * 2),
+            Math.round(this.radius * 2)
+        );
+
+        // Border
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(
+            Math.round(this.x - this.radius),
+            Math.round(this.y - this.radius),
+            Math.round(this.radius * 2),
+            Math.round(this.radius * 2)
+        );
+
+        // Shimmer effect
+        const shimmerOffset = Math.sin(this.shimmer) * 3;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.fillRect(
+            Math.round(this.x - this.radius + 3 + shimmerOffset),
+            Math.round(this.y - this.radius + 3),
+            Math.round(this.radius * 0.4),
+            Math.round(this.radius * 0.3)
+        );
+
+        // Cross pattern for 8-bit feel
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(Math.round(this.x), Math.round(this.y - this.radius + 4));
+        ctx.lineTo(Math.round(this.x), Math.round(this.y + this.radius - 4));
+        ctx.moveTo(Math.round(this.x - this.radius + 4), Math.round(this.y));
+        ctx.lineTo(Math.round(this.x + this.radius - 4), Math.round(this.y));
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}
+
+class Game {
+    constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.ctx.imageSmoothingEnabled = false;
+        
+        this.bubbles = [];
+        this.score = 0;
+        this.highScore = parseInt(localStorage.getItem('bubbleBlastHighScore')) || 0;
+        this.gameRunning = false;
+        this.maxBubbles = 30;
+        this.spawnTimer = 0;
+        this.spawnInterval = 60;
+        this.frameCount = 0;
+        
+        this.titleScreen = document.getElementById('title-screen');
+        this.hud = document.getElementById('hud');
+        this.gameOverScreen = document.getElementById('game-over');
+        this.scoreDisplay = document.getElementById('score');
+        this.bubbleCountDisplay = document.getElementById('bubble-count');
+        this.finalScoreDisplay = document.getElementById('final-score');
+        this.highScoreDisplay = document.getElementById('high-score');
+        
+        this.highScoreDisplay.textContent = this.highScore;
+        
+        this.setupCanvas();
+        this.bindEvents();
+        this.gameLoop();
+    }
+
+    setupCanvas() {
+        const rect = this.canvas.getBoundingClientRect();
+        this.canvas.width = 800;
+        this.canvas.height = 600;
+    }
+
+    bindEvents() {
+        document.getElementById('start-btn').addEventListener('click', () => this.startGame());
+        document.getElementById('restart-btn').addEventListener('click', () => this.startGame());
+
+        this.canvas.addEventListener('click', (e) => {
+            if (!this.gameRunning) return;
+            
+            const rect = this.canvas.getBoundingClientRect();
+            const x = Math.round((e.clientX - rect.left) * (this.canvas.width / rect.width));
+            const y = Math.round((e.clientY - rect.top) * (this.canvas.height / rect.height));
+
+            if (this.bubbles.length < this.maxBubbles) {
+                this.bubbles.push(new Bubble(x, y));
+                this.score += 10;
+            }
+        });
+    }
+
+    startGame() {
+        this.titleScreen.classList.add('hidden');
+        this.gameOverScreen.classList.add('hidden');
+        this.canvas.style.display = 'block';
+        this.hud.classList.remove('hidden');
+        
+        this.bubbles = [];
+        this.score = 0;
+        this.gameRunning = true;
+        this.spawnTimer = 0;
+        this.frameCount = 0;
+    }
+
+    endGame() {
+        this.gameRunning = false;
+        this.gameOverScreen.classList.remove('hidden');
+        this.finalScoreDisplay.textContent = this.score;
+        
+        if (this.score > this.highScore) {
+            this.highScore = this.score;
+            localStorage.setItem('bubbleBlastHighScore', this.highScore);
+            this.highScoreDisplay.textContent = this.highScore;
+        }
+    }
+
+    spawnBubble() {
+        if (this.bubbles.length >= this.maxBubbles) return;
+        
+        const x = 40 + Math.random() * (this.canvas.width - 80);
+        const y = 40 + Math.random() * (this.canvas.height - 80);
+        this.bubbles.push(new Bubble(x, y));
+    }
+
+    update() {
+        if (!this.gameRunning) return;
+        
+        this.frameCount++;
+        this.spawnTimer++;
+
+        if (this.spawnTimer >= this.spawnInterval) {
+            this.spawnBubble();
+            this.spawnTimer = 0;
+        }
+
+        this.bubbles = this.bubbles.filter(bubble => {
+            const alive = bubble.update();
+            if (!alive && bubble.exploding) {
+                this.score += 20;
+            }
+            return alive;
+        });
+
+        this.scoreDisplay.textContent = this.score;
+        this.bubbleCountDisplay.textContent = this.bubbles.length;
+
+        if (this.bubbles.length >= this.maxBubbles * 1.5) {
+            this.endGame();
+        }
+    }
+
+    draw() {
+        this.ctx.fillStyle = '#0f3460';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Grid background
+        this.ctx.strokeStyle = 'rgba(233, 69, 96, 0.1)';
+        this.ctx.lineWidth = 1;
+        for (let x = 0; x < this.canvas.width; x += 32) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, 0);
+            this.ctx.lineTo(x, this.canvas.height);
+            this.ctx.stroke();
+        }
+        for (let y = 0; y < this.canvas.height; y += 32) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, y);
+            this.ctx.lineTo(this.canvas.width, y);
+            this.ctx.stroke();
+        }
+
+        this.bubbles.forEach(bubble => bubble.draw(this.ctx));
+
+        // Scanline effect
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+        for (let y = 0; y < this.canvas.height; y += 4) {
+            this.ctx.fillRect(0, y, this.canvas.width, 2);
+        }
+    }
+
+    gameLoop() {
+        this.update();
+        this.draw();
+        requestAnimationFrame(() => this.gameLoop());
+    }
+}
+
+// Initialize game when page loads
+window.addEventListener('DOMContentLoaded', () => {
+    new Game();
+});
